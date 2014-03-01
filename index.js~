@@ -1,0 +1,199 @@
+var express = require('express');
+var app = express();
+var mysql = require('mysql');
+var dbCFG = require('./db_settings.json');
+var connPool = mysql.createPool(dbCFG);
+var bcrypt = require('bcrypt-nodejs');
+ 
+app.listen(3000);
+
+app.get('/hello', function(request, response) {
+    response.send({res:true, msg:"yoyoyo"});
+});
+
+app.get('/', function(req, res) {
+    return res.send({
+        res: false,
+        err: {
+            code: 998,
+            msg: 'Hackv2 API SERVER\n'
+        }
+    });
+});
+
+// Root callback - show req
+app.post('/', function(req, res) {
+    console.log(req);
+    return res.send({
+        'res': false,
+        'err': {
+            'code': 999,
+            'msg': 'Hackv2 API SERVER\n'
+        }
+    });
+});
+
+app.post('/register', function(req, res) {
+    console.log(req);
+});
+    
+
+function getProductInfo(id, callback) {
+    var query = "SELECT `product` FROM `attr_product` WHERE `EAN13` LIKE ?";
+    var sub = ['%'+id];
+    query = mysql.format(query, sub);
+    console.log(query);
+    connPool.getConnection(function(connErr, conn) {
+        if (connErr) {
+            return callback('Database error', false);
+        }
+
+        conn.query(query, function(err, res) {
+            if (err) {
+                console.log(err.code);
+                callback(err, null);
+            } else {
+                callback(null, res);
+            }
+        });
+
+        conn.release();
+    });
+}
+
+app.get('/lookup/:id', function(req, res) {
+    var id = req.params.id
+    console.log(id);
+    getProductInfo(id, function(err, result) {
+        if (err) {
+            res.send({
+                'res': false,
+                'err': {
+                    'code': 2,
+                    'msg': 'Error on the server'
+                }
+            });
+        } else if (result.length === 0 ) {
+            res.send({
+                'res': false,
+                'err': {
+                    'code': 3,
+                    'msg': 'Product not found'
+                }
+            });
+        } else {
+            res.send({
+                'res': true,
+                'data': result[0]
+            });
+        }
+    });
+      
+});
+var bcrypt = require('bcrypt-nodejs');
+// callback(err, id)
+
+function register(user, password, callback) {
+    bcrypt.hash(password, null, null, function(err, hash) {
+	if (err) {
+	    console.log('Failed to hash password.');
+	    console.log(err);
+	    callback(err, null);
+	} else {
+	    db.addNewUser(user, hash, callback);
+	}
+    });
+}
+
+function compare(pass, hash) {
+	return bcrypt.compareSync(pass, hash);
+}
+
+function localVerify(username, password, done) {
+    console.log("Verifying user: " + username);
+    var passHash = db.getUserHash(username, function(err, user, hash) {
+	if (err) {
+	    console.log(err);
+	    return done(err, null);
+	} else if (user === null || hash === null) {
+	    return done('Unregistered user.', null);
+	} else {
+	    bcrypt.compare(password, hash, function(hErr, correct) {
+		if (hErr) {
+		    return done(hErr, null);
+		} else if (correct) {
+		    return done(null, user);
+		} else {
+		    return done(null, false);
+		}
+	    });
+	}
+    });
+}
+
+var StrategyOptions = Object.freeze({
+    usernameField: 'email',
+    passwordField: 'pass'
+});
+
+var BcryptLocalStrategy = new LocalStrategy(StrategyOptions, localVerify);
+
+function authRoutes(app) {
+    app.post('/register', function(req, res) {
+	if (req.body.email && req.body.pass) {
+	    var name = req.body.name;
+	    var pass = req.body.pass;
+            if (name && pass) {
+                
+            }
+	    if (user.id === false) {
+		// Details of user are invalid.
+		res.send({'res':false, 'err':{'code':1, 'msg':'User details are invalid!'}});
+	    } else {
+		register(user, pass, function(err, id) {
+		    if (err) {
+			// Registration failed, notify api.
+			console.log('Registration failed:');
+			console.log(err);
+			res.send({'res':false, 'err':{'code':2, 'msg':'Registration failed.'}});
+		    } else {
+			// Update id from DB insertion.
+			user.id = id;
+			console.log(['Registered user:',id,mail,pass,name,priv,grav].join(" "));
+			res.send({'res':true, 'user':user});
+			// Login the newly registered user.
+			req.login(user, function(err) {
+			    if (err) {
+				// Login failed for some reason.
+				console.log('Post registration login failed:')
+				console.log(err);
+			    }
+			});
+		    }
+		});
+	    }
+	} else {
+	    res.send({'res':false, 'err':{'code':3, 'msg':'Invalid request.'}});
+	}
+    });
+
+    // Login callback - user auth
+    app.post('/login', function(req, res, next) {
+	passport.authenticate('local', function(err, user, info) {
+	    if (err) {
+		return next(err);
+	    } else if (!user) {
+		return res.send({'res':false, 'err':'No user'});
+	    }
+	    req.logIn(user, function(err) {
+		if (err) {
+		    return next(err);
+		} else {
+		    return res.send({'res':true, 'user':user});
+		}
+	    });
+	})(req, res, next);
+    });
+}
+
+module.exports = {LocalStrategy:BcryptLocalStrategy, register:register, compare:compare, authRoutes:authRoutes};

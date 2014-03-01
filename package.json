@@ -1,0 +1,29 @@
+{
+  "name": "Hackv2-server",
+  "version": "0.0.0",
+  "description": "server ======",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felina/server.git"
+  },
+  "author": "George Field",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/felina/server/issues"
+  },
+  "dependencies": {
+    "express": "~3.4.4",
+    "passport-local": "~0.1.6",
+    "passport": "~0.1.17",
+    "mysql": "~2.0.0-rc1",
+    "underscore": "~1.5.2",
+    "MD5": "~1.2.0",
+    "aws-sdk": "~2.0.0-rc3",
+    "bcrypt-nodejs": "~0.0.3",
+    "email-validator": "~0.1.2"
+  }
+}
