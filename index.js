@@ -4,9 +4,17 @@ var mysql = require('mysql');
 var dbCFG = require('./db_settings.json');
 var connPool = mysql.createPool(dbCFG);
 var bcrypt = require('bcrypt-nodejs');
+var upstream = require('./upstream.js');
  
 app.listen(3000);
 app.use(express.bodyParser());
+
+// connPool.getConnection(function(err, conn) {
+//     upstream.tryFromAPI('5449000159311', conn, function(a, b) {
+//         console.log(a);
+//         console.log(b);
+//     });
+// });
 
 app.get('/hello', function(request, response) {
     response.send({res:true, msg:"yoyoyo"});
@@ -37,7 +45,19 @@ app.post('/', function(req, res) {
 app.post('/register', function(req, res) {
     console.log(req);
 });
-    
+
+function padEAN13(id) {
+    if (id.length > 13) {
+        console.log('BAD EAN');
+        return false;
+    } else {
+        while (id.length <13) {
+            id = '0'+id;
+        }
+        console.log('Padded to: ' + id);
+    }
+    return id;
+}
 
 function getProductInfo(id, callback) {
     var query = "SELECT `product` FROM `attr_product` WHERE `EAN13` LIKE ?";
@@ -50,15 +70,21 @@ function getProductInfo(id, callback) {
         }
 
         conn.query(query, function(err, res) {
+            conn.release();
             if (err) {
                 console.log(err.code);
                 callback(err, null);
             } else {
+                if (res.length === 0) {
+                    // No data for this EAN in the DB
+                    upstream.tryFromAPI(padEAN13(id), conn, function(apiErr, apiResp) {
+                        return callback(apiErr, apiResp);
+                    });
+                }
                 callback(null, res);
             }
         });
 
-        conn.release();
     });
 }
 
