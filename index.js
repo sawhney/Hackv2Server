@@ -119,6 +119,50 @@ app.post('/review/:id', function(req, res) {
     });
 });
 
+function getReviews(id, callback) {
+    var query = "SELECT Username AS user, StarReview / 2 AS rating, TextReview AS review FROM reviews INNER JOIN users USING (UserID) WHERE EAN13 = ?";
+    var sub = [padEAN13(id)];
+    query = mysql.format(query, sub);
+    console.log(query);
+    connPool.getConnection(function(connErr, conn) {
+        if (connErr) {
+            return callback('Database error');
+        }
+
+        conn.query(query, function(err, res) {
+            conn.release();
+            if (err) {
+                return callback('Database error');
+            } else {
+                return callback(null, res);
+            }
+        });
+    });
+}
+
+app.get('/reviews/:id', function(req, res) {
+    var id = req.params.id;
+//    var start = req.query.s;
+//    var end = req.query.e;
+    
+    return getReviews(id, function(err, reviews) {
+        if (err) {
+            res.send({
+                'res': false,
+                'err': {
+                    'code': 2,
+                    'msg': 'Server error.'
+                }
+            });
+        } else {
+            res.send({
+                'res': true,
+                'reviews': reviews
+            });
+        }
+    });
+});
+
 function getRating(id, callback) {
     var query = "SELECT COUNT(*) AS count, AVG(StarReview) / 2 AS average FROM reviews WHERE EAN13 = ?";
     var sub = [padEAN13(id)];
