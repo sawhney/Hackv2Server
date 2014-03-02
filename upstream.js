@@ -2,27 +2,31 @@ var http = require('http');
 var mysql = require('mysql');
 
 function addProduct(db, APIdata, callback) {
-    var query = 'INSERT INTO ean_product VALUES (?,?,?,NULL,NULL,NOW())';
-    var sub = [APIdata.product.EAN13, APIdata.product.UPCA, APIdata.product.UPCE];
+    var query = 'INSERT INTO `products` VALUES (?,?,?,NULL,?,NOW())';
+
+    // Replace n/a values with NULLs
+    if (APIdata.product.UPCA === 'n/a') {
+        APIdata.product.UPCA = null;
+    }
+    if (APIdata.product.UPCE === 'n/a') {
+        APIdata.product.UPCE = null;
+    }
+    if (APIdata.product.attributes.product.trim() == '') {
+        APIdata.product.attributes.product = null;
+    }
+
+    var sub = [APIdata.product.EAN13, APIdata.product.UPCA, APIdata.product.UPCE, APIdata.product.attributes.product];
+
     console.log('INSERT FUN TIME');
     query = mysql.format(query, sub);
     console.log(query);
-    db.query(query, function(err, res) {
+    return db.query(query, function(err, res) {
         if (err) {
             console.log(err);
-            callback(err);
+            return callback(err);
         } else {
-            query = 'INSERT INTO attr_product VALUES (?,?,NOW())';
-            sub = [APIdata.product.EAN13, APIdata.product.attributes.product];
-            query = mysql.format(query, sub);
-            db.query(query, function(e2, r2) {
-                if (e2) {
-                    console.log(e2);
-                    callback(e2);
-                } else {
-                    callback(null, [APIdata.product.attributes.product]);
-                }
-            });
+            console.log('FINISHED INSERTING LIKE A BAWSE');
+            return callback(null, [APIdata.product.attributes.product]);
         }
     });
 }
@@ -37,15 +41,18 @@ module.exports.tryFromAPI = function(EAN13, db, callback) {
     };
 
     var req = http.request(options, function(res) {
-        //var resData = '';
+        var resData = '';
         res.setEncoding('utf8');
         res.on('data', function(data) {
             console.log('API DATA READ');
-            console.log(data);
-            //resData += data;
+            //console.log(data);
+            resData += data;
 
+        });
+        res.on('end', function() {
+            console.log('API Data end.');
             try {
-                var parsed = JSON.parse(data);
+                var parsed = JSON.parse(resData);
             } catch (e) {
                 console.log('JSON parse error.');
                 console.log(e);
@@ -56,16 +63,16 @@ module.exports.tryFromAPI = function(EAN13, db, callback) {
             // Insert parsed into DB
             
             if (parsed.status.code == '200') {
-                addProduct(db, parsed, callback);
-                //callback(null, parsed);
+                console.log('Got API data, sending to DB.');
+                return addProduct(db, parsed, callback);
             } else {
-                callback(parsed.status.message, null);
+                return callback(parsed.status.message, null);
             }
         });
     });
     req.on('error', function(err) {
         console.log(err);
-        callback(err);
+        return callback(err);
     });
     req.end();
 };
